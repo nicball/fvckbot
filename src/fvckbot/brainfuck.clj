@@ -63,11 +63,11 @@
                        (aset-ubyte mem pm n)
                        (recur (inc pc) pm))
                   \> (let [new-pm (inc pm)]
-                       (if (= pm (count mem))
+                       (if (= new-pm (count mem))
                          (print "exception: data pointer out of range.")
                          (recur (inc pc) new-pm)))
                   \< (let [new-pm (dec pm)]
-                       (if (neg? pm)
+                       (if (neg? new-pm)
                          (print "exception: data pointer out of range.")
                          (recur (inc pc) new-pm)))
                   \. (do
