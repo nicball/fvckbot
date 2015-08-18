@@ -1,6 +1,6 @@
 (ns fvckbot.brainfuck)
 
-(defn- ubyte-array [n]
+(defn- ubyte-array ^shorts [n]
   (short-array n))
 
 (defn- aset-ubyte [arr n v]
@@ -22,7 +22,7 @@
         (\+ \- \< \> \, \. \space \tab \newline) (recur (inc pos) level)
         (str "exception: unknown character '" (nth s pos) "'.")))))
 
-(defn- left-bracket [code pc]
+(defn- left-bracket ^long [code pc]
   (loop [pos (dec pc)
          level 0]
     (if (and (= (nth code pos) \[)
@@ -33,7 +33,7 @@
         \[ (recur (dec pos) (dec level))
         (recur (dec pos) level)))))
 
-(defn- right-bracket [code pc]
+(defn- right-bracket ^long [code pc]
   (loop [pos (inc pc)
          level 0]
     (if (and (= (nth code pos) \])
@@ -43,9 +43,6 @@
         \[ (recur (inc pos) (inc level))
         \] (recur (inc pos) (dec level))
         (recur (inc pos) level)))))
-
-(defn- in-bound? [coll n]
-  (< -1 n (count coll)))
 
 (defn- execute [code input timeout]
   (let [mem (ubyte-array 1024)
@@ -66,17 +63,17 @@
                        (aset-ubyte mem pm n)
                        (recur (inc pc) pm))
                   \> (let [new-pm (inc pm)]
-                       (if (in-bound? mem new-pm)
-                         (recur (inc pc) new-pm)
-                         (print "exception: data pointer out of range.")))
+                       (if (= pm (count mem))
+                         (print "exception: data pointer out of range.")
+                         (recur (inc pc) new-pm)))
                   \< (let [new-pm (dec pm)]
-                       (if (in-bound? mem new-pm)
-                         (recur (inc pc) new-pm)
-                         (print "exception: data pointer out of range.")))
+                       (if (neg? pm)
+                         (print "exception: data pointer out of range.")
+                         (recur (inc pc) new-pm)))
                   \. (do
                        (print (char (aget mem pm)))
                        (recur (inc pc) pm))
-                  \, (let [b (.read *in*)]
+                  \, (let [b (.read ^java.io.Reader *in*)]
                       (aset-ubyte mem pm b)
                       (recur (inc pc) pm))
                   \[ (if (zero? (aget mem pm))

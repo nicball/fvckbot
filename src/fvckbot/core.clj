@@ -31,14 +31,14 @@
                 text
                 :reply-to-message (:message-id message)))
 
-(defn get-command [s]
-  (let [begin (first (.split s "[ @]"))]
+(defn get-command [^String s]
+  (let [begin ^String (first (.split s "[ @]"))]
     (str/lower-case 
       (if (.startsWith begin "/")
         (.substring begin 1)
         begin))))
 
-(defn skip-command [s]
+(defn skip-command [^String s]
   (let [idx (.indexOf s " ")]
     (if (= -1 idx)
       ""
@@ -51,7 +51,7 @@
              (assoc db q (conj as a))
              (assoc db q [a])))))
 
-(defn pia [message params]
+(defn pia [message ^String params]
   (if (not= -1 (.indexOf params "%"))
     (let [[q a :as ps] (map str/trim (.split params "%"))]
       (if (or (not= 2 (count ps))
@@ -64,7 +64,7 @@
       (reply-to-message message (rand-nth answer))
       (reply-to-message message "(￣ε(#￣)☆╰╮o(￣▽￣///)"))))
 
-(defn bf [params]
+(defn bf [^String params]
   (if (not= -1 (.indexOf params "%"))
     (let [[code input :as ps] (.split params "%")]
       (if (not= 2 (count ps))
@@ -93,4 +93,4 @@
   (not-found "<h1>Sorry, there is nothing here.</h1>"))
 
 (defn -main [port]
-  (run-jetty app {:port (Integer. port) :join? false}))
+  (run-jetty app {:port (Integer/parseInt port) :join? false}))

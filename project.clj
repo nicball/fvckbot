@@ -8,4 +8,5 @@
                  [environ "1.0.0"]
                  [ring "1.3.0"]
                  [compojure "1.1.8"]]
+  :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.0.0")
