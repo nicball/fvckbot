@@ -59,7 +59,7 @@
                   \+ (let [n (inc (aget mem pm))]
                        (aset-ubyte mem pm n)
                        (recur (inc pc) pm))
-                  \- (let [n (inc (aget mem pm))]
+                  \- (let [n (dec (aget mem pm))]
                        (aset-ubyte mem pm n)
                        (recur (inc pc) pm))
                   \> (let [new-pm (inc pm)]
