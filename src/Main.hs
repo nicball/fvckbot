@@ -12,9 +12,9 @@ import Data.Maybe (fromJust)
 import Data.Text (pack, isPrefixOf, Text)
 import Data.Text.Encoding (decodeUtf8)
 import Data.Vector (toList)
-import Network.HTTP.Client (Proxy(..))
+import Network.HTTP.Client (Proxy(..), Response)
 import Network.HTTP.Req (http, https, (/:), defaultHttpConfig, req, GET(..), runReq, jsonResponse, JsonResponse, Url, Scheme(..), responseBody
-    , NoReqBody(..), queryParam, (=:), ignoreResponse, header, bsResponse, HttpConfig(..), HttpException
+    , NoReqBody(..), queryParam, (=:), ignoreResponse, header, bsResponse, HttpConfig(..), HttpException, toVanillaResponse
     )
 
 botURL :: Url 'Https
@@ -23,7 +23,7 @@ botURL = https "api.telegram.org" /: "bot103568303:AAHmQQfMDnpOdSlTpdyjfhFAcHAOF
 proxyHttpConfig :: HttpConfig
 proxyHttpConfig = defaultHttpConfig { httpConfigProxy = Just (Proxy "localhost" 1081) }
 
-newtype TgApiException = TgApiException (JsonResponse Value)
+newtype TgApiException = TgApiException (Response Value)
     deriving (Show)
 
 instance Exception TgApiException
@@ -34,7 +34,7 @@ getUpdates offset = do
     let body = responseBody res
     if body ^? key "ok" . _Bool == Just True
         then pure . toList $ body ^?! key "result" . _Array
-        else throwIO (TgApiException res)
+        else throwIO . TgApiException . toVanillaResponse $ res
 
 processUpdate :: Value -> IO ()
 processUpdate update = do
