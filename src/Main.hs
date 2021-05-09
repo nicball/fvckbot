@@ -9,6 +9,7 @@ import Data.Aeson.Lens (key, _Array, _Bool, _Integral, _String)
 import Data.Foldable (traverse_)
 import Data.Function ((&), fix)
 import Data.Maybe (fromJust)
+import Data.Monoid (First(..))
 import Data.Text (pack, isPrefixOf, Text)
 import Data.Text.Encoding (decodeUtf8)
 import Data.Vector (toList)
@@ -48,9 +49,22 @@ processMessage msg = do
         cid = msg ^?! key "chat" . key "id" . _Integral
     case msg ^? key "text" . _String of
         Nothing -> putStrLn "Message is not text, ignored:" >> print msg
-        Just text -> if "/get_ip" `isPrefixOf` text
-            then getMyIp >>= sendMessage cid mid
-            else sendMessage cid mid "wat?"
+        Just text -> processCommand text >>= sendMessage cid mid
+
+processCommand :: Text -> IO Text
+processCommand text = do
+    let handlers = [getIp, ping, wat]
+    -- results <- traverse ((First <$>) . ($ text)) handlers
+    -- pure . fromJust . getFirst . mconcat $ results
+    fmap (fromJust . getFirst) . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
+    where
+        wat _ = pure . Just $ "wat?"
+        getIp text = if "/get_ip" `isPrefixOf` text
+            then Just <$> getMyIp
+            else pure Nothing
+        ping text = if "/ping" `isPrefixOf` text
+            then pure . Just $ "ping你妹"
+            else pure Nothing
 
 sendMessage :: Int -> Int -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do
