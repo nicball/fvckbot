@@ -1,11 +1,12 @@
 module Main where
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (handle, Exception, throwIO)
+import Control.Exception (handle, Exception, throwIO, IOException)
 import Control.Lens ((^?), (^?!), (.~), (^.), maximumOf, folded)
 -- import Control.Monad.Except (runExceptT, throwError, lift)
 import Data.Aeson (Value, object, toJSON)
 import Data.Aeson.Lens (key, _Array, _Bool, _Integral, _String)
+import Data.Char (isSpace)
 import Data.Foldable (traverse_)
 import Data.Function ((&), fix)
 import Data.Maybe (fromJust)
@@ -13,11 +14,15 @@ import Data.Monoid (First(..))
 import Data.Text (pack, isPrefixOf, Text)
 import Data.Text.Encoding (decodeUtf8)
 import Data.Vector (toList)
-import Database.SQLite.Simple
+import Database.SQLite.Simple (query, execute, execute_, withConnection, Connection, ResultError, Only(..))
+import GHC.Generics (Generic)
 import Network.HTTP.Client (Proxy(..), Response)
 import Network.HTTP.Req (http, https, (/:), defaultHttpConfig, req, GET(..), runReq, jsonResponse, JsonResponse, Url, Scheme(..), responseBody
     , NoReqBody(..), queryParam, (=:), ignoreResponse, header, bsResponse, HttpConfig(..), HttpException, toVanillaResponse
     )
+import System.Random (randomR, getStdRandom)
+
+import qualified Data.Text as Text
 
 botURL :: Url 'Https
 botURL = https "api.telegram.org" /: "bot103568303:AAHmQQfMDnpOdSlTpdyjfhFAcHAOFOag6vI"
@@ -54,18 +59,45 @@ processMessage msg = do
 
 processCommand :: Text -> IO Text
 processCommand text = do
-    let handlers = [getIp, ping, wat]
+    let handlers = [getIp, ping, pia, rem, wat]
     -- results <- traverse ((First <$>) . ($ text)) handlers
     -- pure . fromJust . getFirst . mconcat $ results
     fmap (fromJust . getFirst) . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
     where
         wat _ = pure . Just $ "wat?"
-        getIp text = if "/get_ip" `isPrefixOf` text
-            then Just <$> getMyIp
+        getIp = check "/get_ip" . const $ Just <$> getMyIp
+        ping = check "/ping" . const . pure . Just $ "ping你妹"
+        pia = check "/pia" getAnswer
+        rem = check "/rem" $ \text -> do
+            let q = Text.takeWhile (not . isSpace) text
+                a = skipWord text
+            setAnswer q a
+            pure . Just $ "朕悉"
+        check cmd f = \text -> if cmd `isPrefixOf` text
+            then f . skipWord $ text
             else pure Nothing
-        ping text = if "/ping" `isPrefixOf` text
-            then pure . Just $ "ping你妹"
-            else pure Nothing
+        skipWord = Text.stripStart . Text.dropWhile (not . isSpace)
+
+getAnswer :: Text -> IO (Maybe Text)
+getAnswer question =
+    handle (\e -> print (e :: ResultError) >> pure Nothing) $
+    handle (\e -> print (e :: IOException) >> pure Nothing) $
+    withPia $ \conn -> do
+    results <- fmap fromOnly <$> query conn "select a from pia where q=?" (Only question)
+    if null results
+        then pure Nothing
+        else Just <$> pick results
+    where
+        pick xs = (xs !!) <$> getStdRandom (randomR (0, length xs - 1))
+
+setAnswer :: Text -> Text -> IO ()
+setAnswer question answer = withPia $ \conn ->
+    execute conn "insert into pia values (?, ?)" (question, answer)
+
+withPia :: (Connection -> IO a) -> IO a
+withPia f = withConnection "./pia.db" $ \conn -> do
+    execute_ conn "create table if not exists pia (q text, a text, unique (q, a))"
+    f conn
 
 sendMessage :: Int -> Int -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do

@@ -27,6 +27,7 @@ executable fvckbot
                      , lens
                      , lens-aeson
                      , mtl
+                     , random
                      , req
                      , sqlite-simple
                      , text
