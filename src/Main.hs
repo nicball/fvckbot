@@ -13,6 +13,7 @@ import Data.Monoid (First(..))
 import Data.Text (pack, isPrefixOf, Text)
 import Data.Text.Encoding (decodeUtf8)
 import Data.Vector (toList)
+import Database.SQLite.Simple
 import Network.HTTP.Client (Proxy(..), Response)
 import Network.HTTP.Req (http, https, (/:), defaultHttpConfig, req, GET(..), runReq, jsonResponse, JsonResponse, Url, Scheme(..), responseBody
     , NoReqBody(..), queryParam, (=:), ignoreResponse, header, bsResponse, HttpConfig(..), HttpException, toVanillaResponse

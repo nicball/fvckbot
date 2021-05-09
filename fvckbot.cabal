@@ -28,5 +28,6 @@ executable fvckbot
                      , lens-aeson
                      , mtl
                      , req
+                     , sqlite-simple
                      , text
                      , vector
