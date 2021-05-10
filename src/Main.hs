@@ -1,9 +1,8 @@
 module Main where
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (handle, Exception, throwIO, IOException)
+import Control.Exception (handle, Exception, throwIO, IOException, catch)
 import Control.Lens ((^?), (^?!), (.~), (^.), maximumOf, folded)
--- import Control.Monad.Except (runExceptT, throwError, lift)
 import Data.Aeson (Value, object, toJSON)
 import Data.Aeson.Lens (key, _Array, _Bool, _Integral, _String)
 import Data.Char (isSpace)
@@ -14,7 +13,7 @@ import Data.Monoid (First(..))
 import Data.Text (pack, isPrefixOf, Text)
 import Data.Text.Encoding (decodeUtf8)
 import Data.Vector (toList)
-import Database.SQLite.Simple (query, query_, execute, execute_, withConnection, Connection, ResultError, Only(..))
+import Database.SQLite.Simple (query, query_, execute, execute_, withConnection, Connection, ResultError, Only(..), SQLError)
 import GHC.Generics (Generic)
 import Network.HTTP.Client (Proxy(..), Response)
 import Network.HTTP.Req (http, https, (/:), defaultHttpConfig, req, GET(..), runReq, jsonResponse, JsonResponse, Url, Scheme(..), responseBody
@@ -73,8 +72,9 @@ processCommand text = do
                 bef = Text.strip bef'
                 aft = Text.strip . Text.drop 2 $ aft'
             let (q, a) = if Text.null aft then ("", bef) else (bef, aft)
-            setAnswer q a
-            pure (Just "朕悉")
+            (setAnswer q a >> pure (Just "朕悉"))
+                `catch` 
+                (\e -> pure . Just . Text.pack . show $ (e :: SQLError))
         dump = check "/dump" . const $ Just <$> dumpDatabase
         check cmd f = \text -> if cmd `isPrefixOf` text
             then f . skipWord $ text
@@ -83,8 +83,6 @@ processCommand text = do
 
 getAnswer :: Text -> IO (Maybe Text)
 getAnswer question =
-    handle (\e -> print (e :: ResultError) >> pure Nothing) $
-    handle (\e -> print (e :: IOException) >> pure Nothing) $
     withPia $ \conn -> do
     results <- fmap fromOnly <$> query conn "select a from pia where q=?" (Only question)
     if null results
@@ -127,7 +125,6 @@ main = flip fix Nothing $ \loop offset ->
     handle (\e -> print (e :: TgApiException) >> loop Nothing) $
     do
     upds <- getUpdates offset
-    -- print upds
     traverse_ (handle (print :: HttpException -> IO ()) . processUpdate) upds
     threadDelay 2000000
     loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integral) $ upds
