@@ -14,7 +14,7 @@ import Data.Monoid (First(..))
 import Data.Text (pack, isPrefixOf, Text)
 import Data.Text.Encoding (decodeUtf8)
 import Data.Vector (toList)
-import Database.SQLite.Simple (query, execute, execute_, withConnection, Connection, ResultError, Only(..))
+import Database.SQLite.Simple (query, query_, execute, execute_, withConnection, Connection, ResultError, Only(..))
 import GHC.Generics (Generic)
 import Network.HTTP.Client (Proxy(..), Response)
 import Network.HTTP.Req (http, https, (/:), defaultHttpConfig, req, GET(..), runReq, jsonResponse, JsonResponse, Url, Scheme(..), responseBody
@@ -59,7 +59,7 @@ processMessage msg = do
 
 processCommand :: Text -> IO Text
 processCommand text = do
-    let handlers = [getIp, ping, pia, rem, wat]
+    let handlers = [getIp, ping, pia, rem, dump, wat]
     -- results <- traverse ((First <$>) . ($ text)) handlers
     -- pure . fromJust . getFirst . mconcat $ results
     fmap (fromJust . getFirst) . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
@@ -69,10 +69,13 @@ processCommand text = do
         ping = check "/ping" . const . pure . Just $ "ping你妹"
         pia = check "/pia" getAnswer
         rem = check "/rem" $ \text -> do
-            let q = Text.takeWhile (not . isSpace) text
-                a = skipWord text
+            let (bef', aft') = Text.breakOn "->" text
+                bef = Text.strip bef'
+                aft = Text.strip . Text.drop 2 $ aft'
+            let (q, a) = if Text.null aft then ("", bef) else (bef, aft)
             setAnswer q a
-            pure . Just $ "朕悉"
+            pure (Just "朕悉")
+        dump = check "/dump" . const $ Just <$> dumpDatabase
         check cmd f = \text -> if cmd `isPrefixOf` text
             then f . skipWord $ text
             else pure Nothing
@@ -93,6 +96,14 @@ getAnswer question =
 setAnswer :: Text -> Text -> IO ()
 setAnswer question answer = withPia $ \conn ->
     execute conn "insert into pia values (?, ?)" (question, answer)
+
+dumpDatabase :: IO Text
+dumpDatabase = withPia $ \conn -> do
+    results <- query_ conn "select * from pia"
+    let msg = mconcat . map (\(q, a) -> q <> " -> " <> a <> "\n") $ results
+    if Text.null msg
+        then pure "无条目"
+        else pure msg
 
 withPia :: (Connection -> IO a) -> IO a
 withPia f = withConnection "./pia.db" $ \conn -> do
