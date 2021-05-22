@@ -4,7 +4,7 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (handle, Exception, throwIO, IOException, catch)
 import Control.Lens ((^?), (^?!), (.~), (^.), maximumOf, folded)
 import Data.Aeson (Value, object, toJSON, encode)
-import Data.Aeson.Lens (key, _Array, _Bool, _Integral, _String)
+import Data.Aeson.Lens (key, _Array, _Bool, _String, _Integer)
 import Data.Char (isSpace)
 import Data.Foldable (traverse_)
 import Data.Function ((&), fix)
@@ -34,7 +34,7 @@ newtype TgApiException = TgApiException (Response Value)
 
 instance Exception TgApiException
 
-getUpdates :: Maybe Int -> IO [Value]
+getUpdates :: Maybe Integer -> IO [Value]
 getUpdates offset = do
     res <- runReq proxyHttpConfig $ req GET (botURL /: "getUpdates") NoReqBody jsonResponse (queryParam "offset" offset)
     let body = responseBody res
@@ -43,18 +43,15 @@ getUpdates offset = do
         else throwIO . TgApiException . toVanillaResponse $ res
 
 processUpdate :: Value -> IO ()
-processUpdate update = do
-    case update ^? key "message" of
-        Just msg -> processMessage msg
-        Nothing -> putStrLn "Update is not a message, ignored:" >> print update
+processUpdate update = maybe (pure ()) processMessage $ update ^? key "message"
 
 processMessage :: Value -> IO ()
 processMessage msg = do
-    let mid = msg ^?! key "message_id" . _Integral
-        cid = msg ^?! key "chat" . key "id" . _Integral
+    let mid = msg ^?! key "message_id" . _Integer
+        cid = msg ^?! key "chat" . key "id" . _Integer
     case msg ^? key "text" . _String of
-        Nothing -> putStrLn "Message is not text, ignored:" >> print msg
         Just text -> processCommand text >>= maybe (pure ()) (sendMessage cid mid)
+        Nothing -> pure ()
 
 processCommand :: Text -> IO (Maybe Text)
 processCommand text = do
@@ -113,14 +110,14 @@ withPia f = withConnection "./fvckbot.db" \conn -> do
 
 withHistory :: (Connection -> IO a) -> IO a
 withHistory f = withConnection "./fvckbot.db" \conn -> do
-    execute_ conn "create table if not exists updates (json text)"
+    execute_ conn "create table if not exists updates (id integer, json text, primary key (id))"
     f conn
 
 logUpdate :: Value -> IO ()
 logUpdate json = withHistory \conn ->
-    execute conn "insert into updates values (?)" (Only . encode $ json)
+    execute conn "insert into updates values (?, ?)" (json ^?! key "update_id" . _Integer, encode $ json)
 
-sendMessage :: Int -> Int -> Text -> IO ()
+sendMessage :: Integer -> Integer -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do
     runReq proxyHttpConfig $ req GET (botURL /: "sendMessage") NoReqBody ignoreResponse
         ("chat_id" =: chatId <> "text" =: text <> "reply_to_message_id" =: replyToMessageId)
@@ -139,4 +136,4 @@ main = flip fix Nothing \loop offset ->
     traverse_ logUpdate upds
     traverse_ (handle (print :: HttpException -> IO ()) . processUpdate) upds
     threadDelay 2000000
-    loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integral) $ upds
+    loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integer) $ upds
