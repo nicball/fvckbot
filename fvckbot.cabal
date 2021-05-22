@@ -20,6 +20,7 @@ executable fvckbot
   default-extensions:  DeriveGeneric
                      , OverloadedStrings
                      , DataKinds
+                     , BlockArguments
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , bytestring

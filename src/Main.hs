@@ -3,7 +3,7 @@ module Main where
 import Control.Concurrent (threadDelay)
 import Control.Exception (handle, Exception, throwIO, IOException, catch)
 import Control.Lens ((^?), (^?!), (.~), (^.), maximumOf, folded)
-import Data.Aeson (Value, object, toJSON)
+import Data.Aeson (Value, object, toJSON, encode)
 import Data.Aeson.Lens (key, _Array, _Bool, _Integral, _String)
 import Data.Char (isSpace)
 import Data.Foldable (traverse_)
@@ -54,16 +54,19 @@ processMessage msg = do
         cid = msg ^?! key "chat" . key "id" . _Integral
     case msg ^? key "text" . _String of
         Nothing -> putStrLn "Message is not text, ignored:" >> print msg
-        Just text -> processCommand text >>= sendMessage cid mid
+        Just text -> processCommand text >>= maybe (pure ()) (sendMessage cid mid)
 
-processCommand :: Text -> IO Text
+processCommand :: Text -> IO (Maybe Text)
 processCommand text = do
     let handlers = [getIp, ping, pia, rem, dump, wat]
     -- results <- traverse ((First <$>) . ($ text)) handlers
     -- pure . fromJust . getFirst . mconcat $ results
-    fmap (fromJust . getFirst) . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
+    fmap getFirst . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
     where
-        wat _ = pure . Just $ "wat?"
+        wat text =
+            if not . Text.null . snd . Text.breakOn "@fvckbot" $ text
+            then pure . Just $ "wat?"
+            else pure Nothing
         getIp = check "/get_ip" . const $ Just <$> getMyIp
         ping = check "/ping" . const . pure . Just $ "ping你妹"
         pia = check "/pia" getAnswer
@@ -83,7 +86,7 @@ processCommand text = do
 
 getAnswer :: Text -> IO (Maybe Text)
 getAnswer question =
-    withPia $ \conn -> do
+    withPia \conn -> do
     results <- fmap fromOnly <$> query conn "select a from pia where q=?" (Only question)
     if null results
         then pure Nothing
@@ -92,11 +95,11 @@ getAnswer question =
         pick xs = (xs !!) <$> getStdRandom (randomR (0, length xs - 1))
 
 setAnswer :: Text -> Text -> IO ()
-setAnswer question answer = withPia $ \conn ->
+setAnswer question answer = withPia \conn ->
     execute conn "insert into pia values (?, ?)" (question, answer)
 
 dumpDatabase :: IO Text
-dumpDatabase = withPia $ \conn -> do
+dumpDatabase = withPia \conn -> do
     results <- query_ conn "select * from pia"
     let msg = mconcat . map (\(q, a) -> q <> " -> " <> a <> "\n") $ results
     if Text.null msg
@@ -104,9 +107,18 @@ dumpDatabase = withPia $ \conn -> do
         else pure msg
 
 withPia :: (Connection -> IO a) -> IO a
-withPia f = withConnection "./pia.db" $ \conn -> do
+withPia f = withConnection "./fvckbot.db" \conn -> do
     execute_ conn "create table if not exists pia (q text, a text, unique (q, a))"
     f conn
+
+withHistory :: (Connection -> IO a) -> IO a
+withHistory f = withConnection "./fvckbot.db" \conn -> do
+    execute_ conn "create table if not exists updates (json text)"
+    f conn
+
+logUpdate :: Value -> IO ()
+logUpdate json = withHistory \conn ->
+    execute conn "insert into updates values (?)" (Only . encode $ json)
 
 sendMessage :: Int -> Int -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do
@@ -120,11 +132,11 @@ getMyIp = do
     pure . decodeUtf8 . responseBody $ ip
 
 main :: IO ()
-main = flip fix Nothing $ \loop offset ->
+main = flip fix Nothing \loop offset ->
     handle (\e -> print (e :: HttpException) >> loop Nothing) $
-    handle (\e -> print (e :: TgApiException) >> loop Nothing) $
-    do
+    handle (\e -> print (e :: TgApiException) >> loop Nothing) do
     upds <- getUpdates offset
     traverse_ (handle (print :: HttpException -> IO ()) . processUpdate) upds
+    traverse_ logUpdate upds
     threadDelay 2000000
     loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integral) $ upds
