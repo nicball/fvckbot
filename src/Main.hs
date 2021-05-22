@@ -136,7 +136,7 @@ main = flip fix Nothing \loop offset ->
     handle (\e -> print (e :: HttpException) >> loop Nothing) $
     handle (\e -> print (e :: TgApiException) >> loop Nothing) do
     upds <- getUpdates offset
-    traverse_ (handle (print :: HttpException -> IO ()) . processUpdate) upds
     traverse_ logUpdate upds
+    traverse_ (handle (print :: HttpException -> IO ()) . processUpdate) upds
     threadDelay 2000000
     loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integral) $ upds
