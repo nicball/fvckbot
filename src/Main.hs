@@ -55,7 +55,7 @@ processMessage msg = do
 
 processCommand :: Text -> IO (Maybe Text)
 processCommand text = do
-    let handlers = [getIp, ping, pia, rem, dump, wat]
+    let handlers = [getIp, ping, pia, rem, dump, wat, getAnswer]
     -- results <- traverse ((First <$>) . ($ text)) handlers
     -- pure . fromJust . getFirst . mconcat $ results
     fmap getFirst . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
