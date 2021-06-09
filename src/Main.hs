@@ -116,6 +116,8 @@ withHistory f = withConnection "./fvckbot.db" \conn -> do
 logUpdate :: Value -> IO ()
 logUpdate json = withHistory \conn ->
     execute conn "insert into updates values (?, ?)" (json ^?! key "update_id" . _Integer, encode $ json)
+    `catch` 
+    (\e -> putStr "logUpdate: " >> print (e :: SQLError))
 
 sendMessage :: Integer -> Integer -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do
