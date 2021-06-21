@@ -38,7 +38,7 @@ getUpdates :: Maybe Integer -> IO [Value]
 getUpdates offset = do
     res <- runReq proxyHttpConfig $ req GET (botURL /: "getUpdates") NoReqBody jsonResponse (queryParam "offset" offset)
     let body = responseBody res
-    if body ^? key "ok" . _Bool == Just True
+    if body ^?! key "ok" . _Bool
         then pure . toList $ body ^?! key "result" . _Array
         else throwIO . TgApiException . toVanillaResponse $ res
 
