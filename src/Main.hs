@@ -33,6 +33,7 @@ import Network.HTTP.Simple
     httpJSON,
     parseRequest_,
     Proxy (..),
+    Request,
     Response,
     setRequestHeader,
     setRequestProxy,
@@ -45,13 +46,21 @@ botURL :: String
 botURL = "https://api.telegram.org/bot103568303:AAHmQQfMDnpOdSlTpdyjfhFAcHAOFOag6vI"
 
 httpProxy :: Proxy
-httpProxy = Proxy "localhost" 1081
+httpProxy = Proxy "127.0.0.1" 1081
 
 newtype TgApiException = TgApiException (Response Value)
   deriving (Show, Exception)
 
 toUft8 :: Show a => a -> BS.ByteString
 toUft8 = encodeUtf8 . Text.pack . show
+
+httpJSONExn :: Request -> IO Value
+httpJSONExn req = do
+  res <- httpJSON req
+  let body = getResponseBody res
+  if body ^?! key "ok" . _Bool
+    then pure body
+    else throwIO . TgApiException $ res
 
 getUpdates :: Maybe Integer -> IO [Value]
 getUpdates offset = do
@@ -60,11 +69,8 @@ getUpdates offset = do
           . setRequestQueryString [("offset", toUft8 <$> offset)]
           . parseRequest_
           $ botURL <> "/getUpdates"
-  res <- httpJSON req
-  let body = getResponseBody res
-  if body ^?! key "ok" . _Bool
-    then pure $ body ^.. key "result" . values
-    else throwIO . TgApiException $ res
+  body <- httpJSONExn req
+  pure $ body ^.. key "result" . values
 
 processUpdate :: Value -> IO ()
 processUpdate update = maybe (pure ()) processMessage $ update ^? key "message"
@@ -145,12 +151,12 @@ logUpdate json =
 
 sendMessage :: Integer -> Integer -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do
-  httpBS
+  httpJSONExn
     . setRequestProxy (Just httpProxy)
     . setRequestQueryString
-      [ ("chatId", Just . toUft8 $ chatId),
-        ("text", Just . encodeUtf8 $text),
-        ("reply_to_message_id", Just . toUft8 $replyToMessageId)
+      [ ("chat_id", Just . toUft8 $ chatId),
+        ("text", Just . encodeUtf8 $ text),
+        ("reply_to_message_id", Just . toUft8 $ replyToMessageId)
       ]
     . parseRequest_
     $ botURL <> "/sendMessage"
