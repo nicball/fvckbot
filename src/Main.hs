@@ -41,9 +41,14 @@ import Network.HTTP.Simple
   )
 import System.IO.Unsafe (unsafePerformIO)
 import System.Random (getStdRandom, randomR)
+import System.Environment (getEnv)
+
+{-# NOINLINE botToken #-}
+botToken :: String
+botToken = unsafePerformIO $ getEnv "TG_BOT_TOKEN"
 
 botURL :: String
-botURL = "https://api.telegram.org/bot103568303:AAHmQQfMDnpOdSlTpdyjfhFAcHAOFOag6vI"
+botURL = "https://api.telegram.org/bot" <> botToken
 
 httpProxy :: Proxy
 httpProxy = Proxy "127.0.0.1" 1081
@@ -139,10 +144,6 @@ sqlConn = unsafePerformIO do
   execute_ conn "create table if not exists pia (q text, a text, unique (q, a))"
   execute_ conn "create table if not exists updates (id integer, json text, primary key (id))"
   pure conn
-
-{-# NOINLINE fuckedConn #-}
-fuckedConn :: Connection
-fuckedConn = unsafePerformIO . open $ "./fucked.db"
 
 logUpdate :: Value -> IO ()
 logUpdate json =
