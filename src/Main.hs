@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (race)
 import Control.Exception (Exception, IOException, catch, handle, throwIO)
 import Control.Lens (folded, maximumOf, (.~), (^.), (^..), (^?), (^?!))
 import Data.Aeson (Value, encode, object, toJSON)
@@ -141,21 +142,23 @@ dumpDatabase = do
 
 evalSql :: Text -> IO Text
 evalSql stmt =
-  handle (\e -> pure . Text.pack . show $ (e :: Sqlite.SQLError)) do
-  colNames <- newIORef []
-  rows <- newIORef []
-  Sqlite.execWithCallback evalConn stmt \n cn row -> do
-    writeIORef colNames cn
-    let rowstr = Text.intercalate "\t" . fmap (fromMaybe "NULL") $ row
-    modifyIORef rows (rowstr :)
-    pure ()
-  colNames <- readIORef colNames
-  rows <- readIORef rows
-  pure . Text.intercalate "\n" $
-    [ Text.intercalate "\t" colNames,
-      "--------------------------------------------"
-    ]
-      <> reverse rows
+  (either id id <$>) . race (threadDelay 1000 >> pure "Timeout") $ do
+    Sqlite.interruptibly evalConn do
+      handle (\e -> pure . Text.pack . show $ (e :: Sqlite.SQLError)) do
+        colNames <- newIORef []
+        rows <- newIORef []
+        Sqlite.execWithCallback evalConn stmt \n cn row -> do
+          writeIORef colNames cn
+          let rowstr = Text.intercalate "\t" . fmap (fromMaybe "NULL") $ row
+          modifyIORef rows (rowstr :)
+          pure ()
+        colNames <- readIORef colNames
+        rows <- readIORef rows
+        pure . Text.take 200 . Text.intercalate "\n" $
+          [ Text.intercalate "\t" colNames,
+            "--------------------------------------------"
+          ]
+            <> reverse rows
 
 {-# NOINLINE sqlConn #-}
 sqlConn :: Connection
