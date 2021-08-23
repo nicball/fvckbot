@@ -154,7 +154,7 @@ evalSql stmt =
           pure ()
         colNames <- readIORef colNames
         rows <- readIORef rows
-        pure . Text.take 200 . Text.intercalate "\n" $
+        pure . Text.take 1000 . Text.intercalate "\n" $
           [ Text.intercalate "\t" colNames,
             "--------------------------------------------"
           ]
@@ -203,7 +203,7 @@ main = flip fix Nothing \loop offset ->
       upds <- getUpdates offset
       traverse_ logUpdate upds
       traverse_ (handle (printException :: HttpException -> IO ()) . processUpdate) upds
-      threadDelay 2000000
+      threadDelay 2_000_000
       loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integer) $ upds
 
 printException :: Exception e => e -> IO ()
