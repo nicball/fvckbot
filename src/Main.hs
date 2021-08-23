@@ -140,7 +140,8 @@ dumpDatabase = do
     else pure msg
 
 evalSql :: Text -> IO Text
-evalSql stmt = do
+evalSql stmt =
+  handle (\e -> pure . Text.pack . show $ (e :: Sqlite.SQLError)) do
   colNames <- newIORef []
   rows <- newIORef []
   Sqlite.execWithCallback evalConn stmt \n cn row -> do
