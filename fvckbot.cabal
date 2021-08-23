@@ -20,6 +20,7 @@ executable fvckbot
   default-extensions:  OverloadedStrings
                      , BlockArguments
                      , DeriveAnyClass
+                     , NumericUnderscores
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , async

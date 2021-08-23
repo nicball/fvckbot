@@ -142,7 +142,7 @@ dumpDatabase = do
 
 evalSql :: Text -> IO Text
 evalSql stmt =
-  (either id id <$>) . race (threadDelay 1000 >> pure "Timeout") $ do
+  (either id id <$>) . race (threadDelay 1_000_000 >> pure "Timeout") $ do
     Sqlite.interruptibly evalConn do
       handle (\e -> pure . Text.pack . show $ (e :: Sqlite.SQLError)) do
         colNames <- newIORef []
