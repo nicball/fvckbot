@@ -4,8 +4,9 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  f = { mkDerivation, aeson, base, bytestring, http-conduit, lens
-      , lens-aeson, lib, random, sqlite-simple, text
+  f = { mkDerivation, aeson, base, bytestring, direct-sqlite
+      , http-conduit, lens, lens-aeson, lib, random, sqlite-simple, text
+      , time
       }:
       mkDerivation {
         pname = "fvckbot";
@@ -14,8 +15,8 @@ let
         isLibrary = false;
         isExecutable = true;
         executableHaskellDepends = [
-          aeson base bytestring http-conduit lens lens-aeson random
-          sqlite-simple text
+          aeson base bytestring direct-sqlite http-conduit lens lens-aeson
+          random sqlite-simple text time
         ];
         homepage = "https://github.com/nicball/fvckbot#readme";
         license = lib.licenses.bsd3;

@@ -9,39 +9,42 @@ import qualified Data.ByteString as BS
 import Data.Char (isSpace)
 import Data.Foldable (traverse_)
 import Data.Function (fix, (&))
-import Data.Maybe (fromJust)
+import Data.IORef (modifyIORef, newIORef, readIORef, writeIORef)
+import Data.Maybe (fromMaybe)
 import Data.Monoid (First (..))
 import Data.Text (Text, isPrefixOf)
 import qualified Data.Text as Text
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Time.LocalTime (getZonedTime)
 import Database.SQLite.Simple
   ( Connection,
-    execute,
-    execute_,
     Only (..),
-    open,
     Query (..),
-    query,
-    query_,
     ResultError,
     SQLError,
+    execute,
+    execute_,
+    open,
+    query,
+    query_,
   )
+import qualified Database.SQLite3 as Sqlite
 import Network.HTTP.Simple
-  ( getResponseBody,
-    httpBS,
-    HttpException,
-    httpJSON,
-    parseRequest_,
+  ( HttpException,
     Proxy (..),
     Request,
     Response,
+    getResponseBody,
+    httpBS,
+    httpJSON,
+    parseRequest_,
     setRequestHeader,
     setRequestProxy,
     setRequestQueryString,
   )
+import System.Environment (getEnv)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Random (getStdRandom, randomR)
-import System.Environment (getEnv)
 
 {-# NOINLINE botToken #-}
 botToken :: String
@@ -90,9 +93,7 @@ processMessage msg = do
 
 processCommand :: Text -> IO (Maybe Text)
 processCommand text = do
-  let handlers = [getIp, ping, pia, rem, dump, wat, getAnswer]
-  -- results <- traverse ((First <$>) . ($ text)) handlers
-  -- pure . fromJust . getFirst . mconcat $ results
+  let handlers = [getIp, ping, pia, rem, dump, wat, sql, getAnswer]
   fmap getFirst . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
   where
     wat text =
@@ -110,6 +111,7 @@ processCommand text = do
       (setAnswer q a >> pure (Just "朕悉"))
         `catch` (\e -> pure . Just . Text.pack . show $ (e :: SQLError))
     dump = check "/dump" . const $ Just <$> dumpDatabase
+    sql = check "/sql" (fmap Just . evalSql)
     check cmd f = \text ->
       if cmd `isPrefixOf` text
         then f . skipWord $ text
@@ -137,6 +139,23 @@ dumpDatabase = do
     then pure "无条目"
     else pure msg
 
+evalSql :: Text -> IO Text
+evalSql stmt = do
+  colNames <- newIORef []
+  rows <- newIORef []
+  Sqlite.execWithCallback evalConn stmt \n cn row -> do
+    writeIORef colNames cn
+    let rowstr = Text.intercalate "\t" . fmap (fromMaybe "NULL") $ row
+    modifyIORef rows (rowstr :)
+    pure ()
+  colNames <- readIORef colNames
+  rows <- readIORef rows
+  pure . Text.intercalate "\n" $
+    [ Text.intercalate "\t" colNames,
+      "--------------------------------------------"
+    ]
+      <> reverse rows
+
 {-# NOINLINE sqlConn #-}
 sqlConn :: Connection
 sqlConn = unsafePerformIO do
@@ -145,10 +164,14 @@ sqlConn = unsafePerformIO do
   execute_ conn "create table if not exists updates (id integer, json text, primary key (id))"
   pure conn
 
+{-# NOINLINE evalConn #-}
+evalConn :: Sqlite.Database
+evalConn = unsafePerformIO $ Sqlite.open "./screwed.db"
+
 logUpdate :: Value -> IO ()
 logUpdate json =
   execute sqlConn "insert into updates values (?, ?)" (json ^?! key "update_id" . _Integer, encode json)
-    `catch` (\e -> putStr "logUpdate: " >> print (e :: SQLError))
+    `catch` (\e -> putStr "logUpdate: " >> printException (e :: SQLError))
 
 sendMessage :: Integer -> Integer -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do
@@ -171,10 +194,16 @@ getMyIp = do
 
 main :: IO ()
 main = flip fix Nothing \loop offset ->
-  handle (\e -> print (e :: HttpException) >> loop Nothing) $
-    handle (\e -> print (e :: TgApiException) >> loop Nothing) do
+  handle (\e -> printException (e :: HttpException) >> loop Nothing) $
+    handle (\e -> printException (e :: TgApiException) >> loop Nothing) do
       upds <- getUpdates offset
       traverse_ logUpdate upds
-      traverse_ (handle (print :: HttpException -> IO ()) . processUpdate) upds
+      traverse_ (handle (printException :: HttpException -> IO ()) . processUpdate) upds
       threadDelay 2000000
       loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integer) $ upds
+
+printException :: Exception e => e -> IO ()
+printException e = do
+  getZonedTime >>= print
+  putStrLn "--------------------------------------"
+  print e

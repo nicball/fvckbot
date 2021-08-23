@@ -23,9 +23,11 @@ executable fvckbot
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , bytestring
+                     , direct-sqlite
                      , http-conduit
                      , lens
                      , lens-aeson
                      , random
                      , sqlite-simple
                      , text
+                     , time
