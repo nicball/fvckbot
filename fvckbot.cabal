@@ -26,6 +26,7 @@ executable fvckbot
                      , async
                      , bytestring
                      , direct-sqlite
+                     , hint
                      , http-conduit
                      , lens
                      , lens-aeson

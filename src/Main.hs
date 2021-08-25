@@ -30,6 +30,7 @@ import Database.SQLite.Simple
     query_,
   )
 import qualified Database.SQLite3 as Sqlite
+import Language.Haskell.Interpreter (runInterpreter, eval)
 import Network.HTTP.Simple
   ( HttpException,
     Proxy (..),
@@ -93,9 +94,10 @@ processMessage msg = do
     Nothing -> pure ()
 
 processCommand :: Text -> IO (Maybe Text)
-processCommand text = do
-  let handlers = [getIp, ping, pia, rem, dump, wat, sql, getAnswer]
-  fmap getFirst . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ handlers
+processCommand text = fmap getFirst . ($ text) . mconcat . (fmap . fmap . fmap $ First) $ commandHandlers
+
+commandHandlers :: [Text -> IO (Maybe Text)]
+commandHandlers = [getIp, ping, pia, rem, dump, wat, sql, hs, getAnswer]
   where
     wat text =
       if not . Text.null . snd . Text.breakOn "@fvckbot" $ text
@@ -113,6 +115,7 @@ processCommand text = do
         `catch` (\e -> pure . Just . Text.pack . show $ (e :: SQLError))
     dump = check "/dump" . const $ Just <$> dumpDatabase
     sql = check "/sql" (fmap Just . evalSql)
+    hs = check "/hs" (fmap Just . evalHs)
     check cmd f = \text ->
       if cmd `isPrefixOf` text
         then f . skipWord $ text
@@ -142,7 +145,7 @@ dumpDatabase = do
 
 evalSql :: Text -> IO Text
 evalSql stmt =
-  (either id id <$>) . race (threadDelay 1_000_000 >> pure "Timeout") $ do
+  timeout 1_000_000 "Timeout" do
     Sqlite.interruptibly evalConn do
       handle (\e -> pure . Text.pack . show $ (e :: Sqlite.SQLError)) do
         colNames <- newIORef []
@@ -159,6 +162,14 @@ evalSql stmt =
             "--------------------------------------------"
           ]
             <> reverse rows
+
+evalHs :: Text -> IO Text
+evalHs prog =
+  timeout 1_000_000 "Timeout" do
+    fmap (either (Text.pack . show) id) . runInterpreter . fmap Text.pack . eval . Text.unpack $ prog
+
+timeout :: Int -> a -> IO a -> IO a
+timeout time deflt = fmap (either id id) . race (threadDelay time >> pure deflt)
 
 {-# NOINLINE sqlConn #-}
 sqlConn :: Connection
