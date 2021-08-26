@@ -30,7 +30,7 @@ import Database.SQLite.Simple
     query_,
   )
 import qualified Database.SQLite3 as Sqlite
-import Language.Haskell.Interpreter (runInterpreter, eval)
+import Language.Haskell.Interpreter (runInterpreter, eval, setImports)
 import Network.HTTP.Simple
   ( HttpException,
     Proxy (..),
@@ -166,7 +166,9 @@ evalSql stmt =
 evalHs :: Text -> IO Text
 evalHs prog =
   timeout 1_000_000 "Timeout" do
-    fmap (either (Text.pack . show) id) . runInterpreter . fmap Text.pack . eval . Text.unpack $ prog
+    fmap (either (Text.pack . show) id) . runInterpreter $ do
+      setImports ["Prelude"]
+      fmap Text.pack . eval . Text.unpack $ prog
 
 timeout :: Int -> a -> IO a -> IO a
 timeout time deflt = fmap (either id id) . race (threadDelay time >> pure deflt)
