@@ -30,7 +30,7 @@ import Database.SQLite.Simple
     query_,
   )
 import qualified Database.SQLite3 as Sqlite
-import Language.Haskell.Interpreter (runInterpreter, eval, setImports)
+import Language.Haskell.Interpreter (eval, runInterpreter, setImports)
 import Network.HTTP.Simple
   ( HttpException,
     Proxy (..),
@@ -157,17 +157,20 @@ evalSql stmt =
           pure ()
         colNames <- readIORef colNames
         rows <- readIORef rows
-        pure . Text.take 1000 . Text.intercalate "\n" $
-          [ Text.intercalate "\t" colNames,
-            "--------------------------------------------"
-          ]
-            <> reverse rows
+        if null colNames
+          then pure "ok"
+          else
+            pure . Text.take 1000 . Text.intercalate "\n" $
+              [ Text.intercalate "\t" colNames,
+                "--------------------------------------------"
+              ]
+                <> reverse rows
 
 evalHs :: Text -> IO Text
 evalHs prog =
   timeout 1_000_000 "Timeout" do
     fmap (either (Text.pack . show) id) . runInterpreter $ do
-      setImports ["Prelude"]
+      setImports ["Prelude", "System.IO.Unsafe"]
       fmap Text.pack . eval . Text.unpack $ prog
 
 timeout :: Int -> a -> IO a -> IO a
