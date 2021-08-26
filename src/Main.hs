@@ -170,7 +170,7 @@ evalHs :: Text -> IO Text
 evalHs prog =
   timeout 1_000_000 "Timeout" do
     fmap (either (Text.pack . show) id) . runInterpreter $ do
-      setImports ["Prelude", "System.IO.Unsafe"]
+      setImports ["Prelude", "System.IO.Unsafe", "System.IO.Silently"]
       fmap Text.pack . eval . Text.unpack $ prog
 
 timeout :: Int -> a -> IO a -> IO a
