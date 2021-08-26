@@ -1,8 +1,8 @@
 module Main where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.Async (race)
-import Control.Exception (Exception, IOException, catch, handle, throwIO)
+import Control.Exception (Exception, IOException, catch, handle, throwIO, SomeException)
 import Control.Lens (folded, maximumOf, (.~), (^.), (^..), (^?), (^?!))
 import Data.Aeson (Value, encode, object, toJSON)
 import Data.Aeson.Lens (key, values, _Array, _Bool, _Integer, _String)
@@ -169,9 +169,10 @@ evalSql stmt =
 evalHs :: Text -> IO Text
 evalHs prog =
   timeout 1_000_000 "Timeout" do
-    fmap (either (Text.pack . show) id) . runInterpreter $ do
-      setImports ["Prelude", "System.IO.Unsafe", "System.IO.Silently"]
-      fmap Text.pack . eval . Text.unpack $ prog
+    handle (\e -> pure . Text.pack . show $ (e :: SomeException)) do
+        fmap (either (Text.pack . show) id) . runInterpreter $ do
+          setImports ["Prelude", "System.IO.Unsafe", "System.IO.Silently"]
+          fmap (Text.pack . take 1000) . eval . Text.unpack $ prog
 
 timeout :: Int -> a -> IO a -> IO a
 timeout time deflt = fmap (either id id) . race (threadDelay time >> pure deflt)
@@ -218,7 +219,7 @@ main = flip fix Nothing \loop offset ->
     handle (\e -> printException (e :: TgApiException) >> loop Nothing) do
       upds <- getUpdates offset
       traverse_ logUpdate upds
-      traverse_ (handle (printException :: HttpException -> IO ()) . processUpdate) upds
+      traverse_ (forkIO . handle (printException :: SomeException -> IO ()) . processUpdate) upds
       threadDelay 2_000_000
       loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integer) $ upds
 
