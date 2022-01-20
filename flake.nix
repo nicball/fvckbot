@@ -3,7 +3,7 @@
   outputs = { self, nixpkgs }: {
     defaultPackage.aarch64-linux =
       let
-        inherit nixpkgs.legacyPackages.aarch64-linux.pkgs;
+        inherit (nixpkgs.legacyPackages.aarch64-linux) pkgs;
         f = { mkDerivation, aeson, async, base, bytestring, direct-sqlite
             , hint, http-conduit, lens, lens-aeson, lib, random, sqlite-simple
             , text, time
