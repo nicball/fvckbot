@@ -56,7 +56,7 @@ botURL :: String
 botURL = "https://api.telegram.org/bot" <> botToken
 
 httpProxy :: Proxy
-httpProxy = Proxy "127.0.0.1" 1081
+httpProxy = Proxy "127.0.0.1" 7890
 
 newtype TgApiException = TgApiException (Response Value)
   deriving (Show, Exception)
@@ -165,11 +165,8 @@ evalSql stmt =
 
 evalHs :: Text -> IO Text
 evalHs prog =
-  pure "用不了了！"
-{-
   timeout 1_000_000 "Timeout" do
     fmap (either (Text.pack . show) id) . runInterpreter . fmap Text.pack . eval . Text.unpack $ prog
--}
 
 timeout :: Int -> a -> IO a -> IO a
 timeout time deflt = fmap (either id id) . race (threadDelay time >> pure deflt)
