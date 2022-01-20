@@ -31,7 +31,8 @@ executable fvckbot
                      , lens
                      , lens-aeson
                      , random
+                     , silently
                      , sqlite-simple
                      , text
                      , time
-  ghc-options: -dynamic
+ ghc-options:          -dynamic
