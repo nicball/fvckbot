@@ -217,10 +217,10 @@ main :: IO ()
 main = flip fix Nothing \loop offset ->
   handle (\e -> printException (e :: HttpException) >> loop Nothing) $
     handle (\e -> printException (e :: TgApiException) >> loop Nothing) do
+      threadDelay 2_000_000
       upds <- getUpdates offset
       traverse_ logUpdate upds
       traverse_ (forkIO . handle (printException :: SomeException -> IO ()) . processUpdate) upds
-      threadDelay 2_000_000
       loop . fmap (+ 1) . maximumOf (folded . key "update_id" . _Integer) $ upds
 
 printException :: Exception e => e -> IO ()
