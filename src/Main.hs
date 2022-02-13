@@ -103,7 +103,7 @@ commandHandlers = [getIp, ping, pia, rem, dump, wat, sql, hs, getAnswer]
       if not . Text.null . snd . Text.breakOn "@fvckbot" $ text
         then pure . Just $ "wat?"
         else pure Nothing
-    getIp = check "/get_ip" . const $ Just <$> getMyIp
+    getIp = check "/get_ip" . const . pure . Just $ "nicball.me"
     ping = check "/ping" . const . pure . Just $ "ping你妹"
     pia = check "/pia" getAnswer
     rem = check "/rem" $ \text -> do
