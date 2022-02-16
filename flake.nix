@@ -1,10 +1,13 @@
 {
   description = "fvckbot";
   outputs = { self, nixpkgs }: {
-    defaultPackage.aarch64-linux =
+    defaultPackage =
       let
-        inherit (nixpkgs.legacyPackages.aarch64-linux) pkgs;
+        mkPackage = arch: nixpkgs.legacyPackages."${arch}".haskellPackages.callPackage ./default.nix {};
       in
-        pkgs.haskellPackages.callPackage ./default.nix {};
+        {
+          aarch64-linux = mkPackage "aarch64-linux";
+          x86_64-linux = mkPackage "x86_64-linux";
+        };
   };
 }
