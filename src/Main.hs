@@ -55,9 +55,6 @@ botToken = unsafePerformIO $ getEnv "TG_BOT_TOKEN"
 botURL :: String
 botURL = "https://api.telegram.org/bot" <> botToken
 
-httpProxy :: Proxy
-httpProxy = Proxy "127.0.0.1" 7890
-
 newtype TgApiException = TgApiException (Response Value)
   deriving (Show, Exception)
 
@@ -75,8 +72,7 @@ httpJSONExn req = do
 getUpdates :: Maybe Integer -> IO [Value]
 getUpdates offset = do
   let req =
-        setRequestProxy (Just httpProxy)
-          . setRequestQueryString [("offset", toUft8 <$> offset)]
+          setRequestQueryString [("offset", toUft8 <$> offset)]
           . parseRequest_
           $ botURL <> "/getUpdates"
   body <- httpJSONExn req
@@ -103,7 +99,8 @@ commandHandlers = [getIp, ping, pia, rem, dump, wat, sql, hs, getAnswer]
       if not . Text.null . snd . Text.breakOn "@fvckbot" $ text
         then pure . Just $ "wat?"
         else pure Nothing
-    getIp = check "/get_ip" . const . pure . Just $ "nicball.me"
+    -- getIp = check "/get_ip" . const $ Just <$> getMyIp
+    getIp = check "/get_ip" . pure . pure . pure $ "nicball.me"
     ping = check "/ping" . const . pure . Just $ "ping你妹"
     pia = check "/pia" getAnswer
     rem = check "/rem" $ \text -> do
@@ -197,7 +194,6 @@ logUpdate json =
 sendMessage :: Integer -> Integer -> Text -> IO ()
 sendMessage chatId replyToMessageId text = do
   httpJSONExn
-    . setRequestProxy (Just httpProxy)
     . setRequestQueryString
       [ ("chat_id", Just . toUft8 $ chatId),
         ("text", Just . encodeUtf8 $ text),
@@ -209,7 +205,7 @@ sendMessage chatId replyToMessageId text = do
 
 getMyIp :: IO Text
 getMyIp = do
-  let req = setRequestHeader "User-Agent" ["curl/6.6.6"] . parseRequest_ $ "http://ifconfig.co"
+  let req = setRequestProxy Nothing . setRequestHeader "User-Agent" ["curl/6.6.6"] . parseRequest_ $ "http://ifconfig.co"
   res <- httpBS req
   pure . decodeUtf8 . getResponseBody $ res
 
