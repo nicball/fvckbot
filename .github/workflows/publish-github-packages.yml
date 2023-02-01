@@ -18,4 +18,5 @@ jobs:
         - name: Push Image to GitHub Packages
           run: |
               cat result | docker load
+              docker tag fvckbot ghcr.io/nicball/fvckbot
               docker push fvckbot
