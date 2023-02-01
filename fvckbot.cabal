@@ -35,4 +35,4 @@ executable fvckbot
                      , sqlite-simple
                      , text
                      , time
- ghc-options:          -dynamic
+  ghc-options:          -dynamic
