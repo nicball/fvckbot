@@ -26,7 +26,7 @@ executable fvckbot
                      , async
                      , bytestring
                      , direct-sqlite
-                     , hint
+                     -- , hint
                      , http-conduit
                      , lens
                      , lens-aeson
@@ -35,4 +35,4 @@ executable fvckbot
                      , sqlite-simple
                      , text
                      , time
-  ghc-options:          -dynamic
+  -- ghc-options:          -dynamic

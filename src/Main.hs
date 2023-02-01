@@ -30,7 +30,7 @@ import Database.SQLite.Simple
     query_,
   )
 import qualified Database.SQLite3 as Sqlite
-import Language.Haskell.Interpreter (eval, runInterpreter, setImports)
+-- import Language.Haskell.Interpreter (eval, runInterpreter, setImports)
 import Network.HTTP.Simple
   ( HttpException,
     Proxy (..),
@@ -112,7 +112,8 @@ commandHandlers = [getIp, ping, pia, rem, dump, wat, sql, hs, getAnswer]
         `catch` (\e -> pure . Just . Text.pack . show $ (e :: SQLError))
     dump = check "/dump" . const $ Just <$> dumpDatabase
     sql = check "/sql" (fmap Just . evalSql)
-    hs = check "/hs" (fmap Just . evalHs)
+    -- hs = check "/hs" (fmap Just . evalHs)
+    hs = pure . pure $ Nothing
     check cmd f = \text ->
       if cmd `isPrefixOf` text
         then f . skipWord $ text
@@ -163,13 +164,13 @@ evalSql stmt =
               ]
                 <> reverse rows
 
-evalHs :: Text -> IO Text
-evalHs prog =
-  timeout 1_000_000 "Timeout" do
-    handle (\e -> pure . Text.pack . show $ (e :: SomeException)) do
-        fmap (either (Text.pack . show) id) . runInterpreter $ do
-          setImports ["Prelude", "System.IO.Unsafe", "System.IO.Silently"]
-          fmap (Text.pack . take 1000) . eval . Text.unpack $ prog
+-- evalHs :: Text -> IO Text
+-- evalHs prog =
+--   timeout 1_000_000 "Timeout" do
+--     handle (\e -> pure . Text.pack . show $ (e :: SomeException)) do
+--         fmap (either (Text.pack . show) id) . runInterpreter $ do
+--           setImports ["Prelude", "System.IO.Unsafe", "System.IO.Silently"]
+--           fmap (Text.pack . take 1000) . eval . Text.unpack $ prog
 
 timeout :: Int -> a -> IO a -> IO a
 timeout time deflt = fmap (either id id) . race (threadDelay time >> pure deflt)
