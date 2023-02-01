@@ -2,6 +2,7 @@ name: Publish GitHub Packages
 on: push
 jobs:
     publish-github-packages:
+        name: Publish GitHub Packages
         runs-on: ubuntu-latest
         permissions:
             packages: write
@@ -19,4 +20,4 @@ jobs:
           run: |
               cat result | docker load
               docker tag fvckbot:latest ghcr.io/nicball/fvckbot:latest
-              docker push fvckbot
+              docker push ghcr.io/nicball/fvckbot
