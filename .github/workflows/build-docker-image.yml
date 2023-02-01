@@ -1,0 +1,21 @@
+name: Publish GitHub Packages
+on: push
+jobs:
+    publish-github-packages:
+        runs-on: ubuntu-latest
+        permissions:
+            packages: write
+            contents: read
+        steps:
+        - uses: actions/checkout@v3
+        - uses: cachix/install-nix-action@v18
+          with:
+              github_access_token: ${{ secrets.GITHUB_TOKEN }}
+        - name: Build with Nix
+          run: nix build .#fvckbot-docker
+        - name: Log in to GitHub Packages
+          run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        - name: Push Image to GitHub Packages
+          run: |
+              cat result | docker load
+              docker push fvckbot
