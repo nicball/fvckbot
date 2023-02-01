@@ -9,6 +9,7 @@
         fvckbot-docker = with nixpkgs.legacyPackages."${system}";
           dockerTools.buildImage {
             name = "fvckbot";
+            tag = "latest";
             config.Entrypoint = "${packages.fvckbot}/bin/fvckbot";
           };
       };
