@@ -11,6 +11,7 @@
             name = "fvckbot";
             tag = "latest";
             config.Entrypoint = "${packages.fvckbot}/bin/fvckbot";
+            copyToRoot = with dockerTools; [ caCertificates ];
           };
       };
     });
