@@ -14,5 +14,8 @@
             copyToRoot = with dockerTools; [ caCertificates ];
           };
       };
+      overlays.default = self: super: {
+        fvckbot = self.callPackage ./default.nix {};
+      };
     });
 }
